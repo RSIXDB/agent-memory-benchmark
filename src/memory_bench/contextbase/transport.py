@@ -1,6 +1,9 @@
 """Audited HTTP reads and bounded Anthropic-compatible model calls."""
 
 import asyncio
+import hashlib
+import inspect
+import json
 import os
 import time
 from pathlib import Path
@@ -47,17 +50,17 @@ class ReadOnlyAPI:
             "/v1/default/banks/" + quote(question.bank_id, safe="") + "/memories/recall"
         )
         start = time.monotonic()
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=300)
-        ) as session:
-            async with session.post(
+        async with (
+            aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=300)) as session,
+            session.post(
                 self.recipe.api_url.rstrip("/") + path,
                 json=body,
                 headers={"Authorization": "Bearer " + key},
-            ) as response:
-                if response.status != 200:
-                    raise RuntimeError(f"Recall HTTP {response.status}")
-                raw = await response.json()
+            ) as response,
+        ):
+            if response.status != 200:
+                raise RuntimeError(f"Recall HTTP {response.status}")
+            raw = await response.json()
         result = Recall.model_validate(raw)
         write_json(
             cache,
@@ -69,6 +72,96 @@ class ReadOnlyAPI:
             },
         )
         return result
+
+    async def native_sdk_context(self, question: Question) -> str:
+        """Explicit comparator; preserve the actual SDK's full JSON serialization.
+
+        The historical baseline method remains unchanged. Install the matching
+        ContextBase SDK or expose its Python directory through PYTHONPATH.
+        """
+        from contextbase_client import ContextBase
+
+        request = {
+            "bank_id": question.bank_id,
+            "query": question.query,
+            "budget": "high",
+            "max_tokens": self.recipe.facts_budget,
+            "include_entities": False,
+            "include_chunks": self.recipe.chunks_budget > 0,
+            "max_chunk_tokens": self.recipe.chunks_budget,
+            "trace": False,
+            "query_timestamp": question.query_timestamp,
+        }
+        sdk_file = inspect.getsourcefile(ContextBase)
+        if sdk_file is None:
+            raise ValueError("The comparator requires an identifiable SDK source")
+        identity = {
+            "request": request,
+            "sdk_source_sha256": hashlib.sha256(Path(sdk_file).read_bytes()).hexdigest(),
+        }
+        cache = self.recipe.output / "sdk-recalls" / (digest(identity) + ".json")
+        if cache.exists():
+            saved = read_json(cache)
+            if saved["identity"] != identity or digest(saved["raw"]) != saved["raw_sha256"]:
+                raise ValueError("SDK recall cache identity/integrity mismatch")
+            return json.dumps(saved["raw"])
+        if self.recipe.api_keys_file_env:
+            key = read_json(Path(os.environ[self.recipe.api_keys_file_env]))[question.bank_id]
+        else:
+            key = os.environ[self.recipe.api_key_env]
+        client = ContextBase(
+            base_url=self.recipe.api_url, api_key=key, max_attempts=1, timeout=240
+        )
+        try:
+            result = await client.arecall(**request)
+            raw = result.model_dump(mode="json")
+        finally:
+            await client.aclose()
+        write_json(cache, {"identity": identity, "raw": raw, "raw_sha256": digest(raw)})
+        return json.dumps(raw)
+
+    async def source_evidence(self, question: Question) -> str:
+        """Opt-in route owns native recall; do not issue a duplicate recall here."""
+        from .evidence_client import EvidenceClient
+
+        options = self.recipe.evidence_options
+        if options is None:
+            raise ValueError("An explicit evidence configuration is required")
+        request = {
+            "bank_id": question.bank_id,
+            "query": question.query,
+            "max_tokens": self.recipe.facts_budget,
+            "query_timestamp": question.query_timestamp,
+            "options": options.model_dump(mode="json"),
+        }
+        cache = self.recipe.output / "evidence" / (digest(request) + ".json")
+        if cache.exists():
+            saved = read_json(cache)
+            if (
+                saved["request"] != request
+                or digest(saved["response"]) != saved["response_sha256"]
+            ):
+                raise ValueError("Evidence cache identity/integrity mismatch")
+            return saved["response"]["evidence"]["context"]
+        if self.recipe.api_keys_file_env:
+            key = read_json(Path(os.environ[self.recipe.api_keys_file_env]))[
+                question.bank_id
+            ]
+        else:
+            key = os.environ[self.recipe.api_key_env]
+        client = EvidenceClient(
+            self.recipe.api_url, {"Authorization": "Bearer " + key}, options
+        )
+        raw = await client.recall(
+            question.bank_id,
+            question.query,
+            max_tokens=self.recipe.facts_budget,
+            query_timestamp=question.query_timestamp,
+        )
+        write_json(
+            cache, {"request": request, "response": raw, "response_sha256": digest(raw)}
+        )
+        return raw["evidence"]["context"]
 
 
 class Models:
@@ -132,10 +225,11 @@ class Models:
         url = os.environ[settings.base_url_env].rstrip("/") + "/v1/messages"
         start = time.monotonic()
         try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=240)
-            ) as session:
-                async with session.post(
+            async with (
+                aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=240)
+                ) as session,
+                session.post(
                     url,
                     json=body,
                     headers={
@@ -143,14 +237,15 @@ class Models:
                         "Authorization": "Bearer " + key,
                         "anthropic-version": "2023-06-01",
                     },
-                ) as response:
-                    raw = await response.json()
-                    write_json(
-                        folder / "raw.json",
-                        {"status": response.status, "response": raw},
-                    )
-                    if response.status != 200:
-                        raise RuntimeError(f"Model HTTP {response.status}")
+                ) as response,
+            ):
+                raw = await response.json()
+                write_json(
+                    folder / "raw.json",
+                    {"status": response.status, "response": raw},
+                )
+                if response.status != 200:
+                    raise RuntimeError(f"Model HTTP {response.status}")
             if raw.get("stop_reason") == "max_tokens":
                 raise ValueError("Model output truncated")
             if schema:

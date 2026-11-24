@@ -1,0 +1,17 @@
+{
+  "output": ".local/contextbase/locomo-repro",
+  "api_url": "http://127.0.0.1:8888",
+  "bank_prefix": "cb_locomo_choose_unique_run",
+  "data_path_env": "LOCOMO_DATA_PATH",
+  "api_key_env": "CONTEXTBASE_READ_KEY",
+  "model_base_url_env": "CONTEXTBASE_MODEL_URL",
+  "model_key_env": "CONTEXTBASE_MODEL_KEY",
+  "model_path": "/v1/chat/completions",
+  "reader_model": "zhipu/glm-5.3",
+  "judge_model": "qwen4-max",
+  "reader_max_tokens": 32768,
+  "judge_max_tokens": 4096,
+  "concurrency": 4,
+  "format_retries": 1,
+  "ingest_doc_id_metadata": false
+}
