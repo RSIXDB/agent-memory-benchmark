@@ -1,14 +1,14 @@
 {
   "dataset": "beam10m",
-  "method": "source-evidence-v2",
+  "method": "source-evidence-v3",
   "questions": ".contextbase/beam10m/questions.jsonl",
   "evaluation": ".contextbase/beam10m/evaluation.json",
   "audit_report": ".contextbase/audit/beam10m-reuse-audit.json",
-  "output": ".contextbase/runs/beam10m-source-evidence-v2",
+  "output": ".contextbase/runs/beam10m-source-evidence-v3",
   "api_url": "http://127.0.0.1:8888",
   "facts_budget": 12288,
   "chunks_budget": 8192,
-  "context_budget": 60000,
+  "context_budget": 64000,
   "reader": {
     "model": "volcengine/deepseek-v4.1-flash",
     "max_tokens": 16384
@@ -19,11 +19,10 @@
   },
   "api_keys_file_env": "CONTEXTBASE_BANK_KEYS_FILE",
   "evidence_options": {
-    "version": "source-evidence-v2",
-    "max_tokens": 60000,
+    "version": "source-evidence-v3",
+    "max_tokens": 64000,
+    "assembly": "native_first",
     "independent_search": true,
-    "fact_fraction": 0.15,
-    "user_fraction": 0.6,
     "neighbor_messages": 1
   },
   "environment_report": ".contextbase/current-environment.json"

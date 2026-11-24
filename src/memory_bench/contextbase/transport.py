@@ -1,6 +1,9 @@
 """Audited HTTP reads and bounded Anthropic-compatible model calls."""
 
 import asyncio
+import hashlib
+import inspect
+import json
 import os
 import time
 from pathlib import Path
@@ -69,6 +72,50 @@ class ReadOnlyAPI:
             },
         )
         return result
+
+    async def native_sdk_context(self, question: Question) -> str:
+        """Explicit comparator; preserve the actual SDK's full JSON serialization.
+
+        The historical baseline method remains unchanged. Install the matching
+        ContextBase SDK or expose its Python directory through PYTHONPATH.
+        """
+        from contextbase_client import ContextBase
+
+        request = {
+            "bank_id": question.bank_id,
+            "query": question.query,
+            "budget": "high",
+            "max_tokens": self.recipe.facts_budget,
+            "include_entities": False,
+            "include_chunks": self.recipe.chunks_budget > 0,
+            "max_chunk_tokens": self.recipe.chunks_budget,
+            "trace": False,
+            "query_timestamp": question.query_timestamp,
+        }
+        sdk_file = inspect.getsourcefile(ContextBase)
+        if sdk_file is None:
+            raise ValueError("The comparator requires an identifiable SDK source")
+        identity = {
+            "request": request,
+            "sdk_source_sha256": hashlib.sha256(Path(sdk_file).read_bytes()).hexdigest(),
+        }
+        cache = self.recipe.output / "sdk-recalls" / (digest(identity) + ".json")
+        if cache.exists():
+            saved = read_json(cache)
+            if saved["identity"] != identity or digest(saved["raw"]) != saved["raw_sha256"]:
+                raise ValueError("SDK recall cache identity/integrity mismatch")
+            return json.dumps(saved["raw"])
+        if self.recipe.api_keys_file_env:
+            key = read_json(Path(os.environ[self.recipe.api_keys_file_env]))[question.bank_id]
+        else:
+            key = os.environ[self.recipe.api_key_env]
+        client = ContextBase(
+            base_url=self.recipe.api_url, api_key=key, max_attempts=1, timeout=240
+        )
+        result = await client.arecall(**request)
+        raw = result.model_dump(mode="json")
+        write_json(cache, {"identity": identity, "raw": raw, "raw_sha256": digest(raw)})
+        return json.dumps(raw)
 
     async def source_evidence(self, question: Question) -> str:
         """Opt-in route owns native recall; do not issue a duplicate recall here."""

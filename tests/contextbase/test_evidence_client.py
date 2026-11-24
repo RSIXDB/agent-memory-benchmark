@@ -81,7 +81,7 @@ def test_reuse_runner_issues_one_evidence_request_and_preserves_the_cached_first
     calls = []
     recipe = Recipe(
         dataset="beam10m",
-        method="source-evidence-v2",
+        method="source-evidence-v3",
         questions=tmp_path / "questions",
         evaluation=tmp_path / "gold",
         audit_report=tmp_path / "audit",
@@ -112,3 +112,53 @@ def test_reuse_runner_issues_one_evidence_request_and_preserves_the_cached_first
         recipe.model_copy(update={"context_budget": 2000}).model_validate(
             {**recipe.model_dump(), "context_budget": 2000}
         )
+
+
+def test_explicitly_disabled_originals_are_not_overridden_by_the_enhancement():
+    class Provider:
+        def _recall_kwargs(self, *args, **kwargs):
+            return {
+                "bank_id": "b",
+                "query": "q",
+                "include_chunks": False,
+                "max_tokens": 1000,
+            }
+
+        def _recall_endpoint(self):
+            raise AssertionError(
+                "Must refuse the conflicting configuration before HTTP"
+            )
+
+    with pytest.raises(ValueError, match="original-source access"):
+        asyncio.run(retrieve_enhanced(Provider(), "q", "u", None, None))
+
+
+def test_explicit_sdk_comparator_preserves_the_full_response_and_first_cache(tmp_path, monkeypatch):
+    import asyncio
+    import json
+    import sys
+    from types import SimpleNamespace
+
+    from memory_bench.contextbase.models import Question, Recipe
+    from memory_bench.contextbase.transport import ReadOnlyAPI
+
+    requests = []
+    raw = {"results": [{"id": "m", "text": "fact", "entities": None}], "trace": None, "chunks": {"c": {"text": "source"}}}
+
+    class SDK:
+        def __init__(self, **settings):
+            assert settings["max_attempts"] == 1 and settings["timeout"] == 240
+
+        async def arecall(self, **request):
+            requests.append(request)
+            return SimpleNamespace(model_dump=lambda **_: raw)
+
+    monkeypatch.setitem(sys.modules, "contextbase_client", SimpleNamespace(ContextBase=SDK))
+    monkeypatch.setenv("CONTEXTBASE_READ_KEY", "synthetic")
+    recipe = Recipe(dataset="longmemeval-s", method="native-sdk-json", questions=tmp_path / "q", evaluation=tmp_path / "e", audit_report=tmp_path / "a", output=tmp_path, api_url="http://127.0.0.1:1", reader={"model": "test"}, judge={"model": "test"})
+    q = Question(id="q", query="question", bank_id="b", query_timestamp="2020-01-01T00:00:00Z")
+    api = ReadOnlyAPI(recipe)
+    first = asyncio.run(api.native_sdk_context(q))
+    assert first == json.dumps(raw)
+    assert asyncio.run(api.native_sdk_context(q)) == first and len(requests) == 1
+    assert requests[0] == {"bank_id": "b", "query": "question", "budget": "high", "max_tokens": 32768, "include_entities": False, "include_chunks": True, "max_chunk_tokens": 16384, "trace": False, "query_timestamp": q.query_timestamp}

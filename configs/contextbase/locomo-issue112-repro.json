@@ -1,6 +1,6 @@
 {
   "output": ".local/contextbase/locomo-repro",
-  "api_url": "http://127.0.0.1:8925",
+  "api_url": "http://127.0.0.1:8888",
   "bank_prefix": "cb_locomo_choose_unique_run",
   "data_path_env": "LOCOMO_DATA_PATH",
   "api_key_env": "CONTEXTBASE_READ_KEY",

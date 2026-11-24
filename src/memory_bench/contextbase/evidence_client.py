@@ -20,8 +20,8 @@ from ..models import Document
 
 class EnhancedMemoryOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    version: Literal["source-evidence-v2"] = "source-evidence-v2"
-    max_tokens: int = Field(default=48000, ge=256, le=120000)
+    version: Literal["source-evidence-v3"] = "source-evidence-v3"
+    max_tokens: int = Field(default=64000, ge=256, le=120000)
     tokenizer: Literal["cl100k_base", "o200k_base"] = "o200k_base"
     max_documents: int = Field(default=128, ge=1, le=256)
     max_source_characters: int = Field(default=4000000, ge=1000, le=4000000)
@@ -29,7 +29,9 @@ class EnhancedMemoryOptions(BaseModel):
     neighbor_messages: int = Field(default=1, ge=0, le=3)
     fact_fraction: float = Field(default=0.15, ge=0, le=0.5)
     user_fraction: float = Field(default=0.60, ge=0, le=0.9)
-    assembly: Literal["ranked_windows", "user_coverage"] = "user_coverage"
+    assembly: Literal["ranked_windows", "user_coverage", "native_first"] = (
+        "native_first"
+    )
     independent_search: bool = True
     before: AwareDatetime | None = None
 
@@ -41,7 +43,7 @@ def enhanced_memory_enabled() -> bool:
     return value == "true"
 
 
-def options_from_environment(default_max_tokens: int = 48000) -> EnhancedMemoryOptions:
+def options_from_environment(default_max_tokens: int = 64000) -> EnhancedMemoryOptions:
     values = json.loads(os.environ.get("AMB_ENHANCED_MEMORY_OPTIONS", "{}"))
     if not isinstance(values, dict):
         raise TypeError("AMB_ENHANCED_MEMORY_OPTIONS must be a JSON object")
@@ -155,9 +157,14 @@ async def retrieve_enhanced(
             "Unsupported enhanced-memory recall fields: "
             + ", ".join(sorted(unsupported))
         )
+    if kwargs.get("include_chunks") is False or kwargs.get("max_chunk_tokens") == 0:
+        raise ValueError(
+            "Enhanced evidence requires original-source access; chunk-disabled settings are incompatible"
+        )
+    if kwargs.get("include_entities"):
+        raise ValueError("Extra entity output is not supported by enhanced evidence")
     base_url, headers = provider._recall_endpoint()
-    budget = 60000 if getattr(provider, "_dataset", None) == "beam" else 48000
-    client = EvidenceClient(base_url, headers, options_from_environment(budget))
+    client = EvidenceClient(base_url, headers, options_from_environment())
     result = await client.recall(
         kwargs["bank_id"],
         kwargs["query"],

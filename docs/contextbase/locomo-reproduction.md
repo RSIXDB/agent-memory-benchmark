@@ -37,4 +37,11 @@ PYTHONPATH=src uv run python -m memory_bench.contextbase.locomo_repro evaluate \
 
 这两个正文预算不包含返回 JSON 的来源 ID、日期、分数等开销。实际答题输入应读取模型 usage；不能把 32768+16384 当作总提示长度。
 
-完整安装使用仓库 `uv sync`。精简环境可通过 `uv run --no-project --with aiohttp --with pydantic` 加 `PYTHONPATH=src` 运行此模块，无需安装无关的 memory provider SDK。
+完整安装使用仓库 `uv sync`。精简环境可通过 `uv run --no-project --with aiohttp --with pydantic --with tiktoken` 加 `PYTHONPATH=src` 运行此模块，无需安装无关的 memory provider SDK。
+
+
+## 在同一份数据上复测服务端增强
+
+[增强配置示例](../../configs/contextbase/locomo-enhanced.example.json) 复用相同 bank_prefix，使用独立 output；将 api_url 指向已安装 V3、开启实验路由并准备好索引的服务。只需设置 enhanced_memory=true 即选择 native_first64K，额外参数可在 evidence_options 中冻结。不要再次 ingest，也不要把两种模式写入同一输出目录。
+
+依次执行 prepare、audit、evaluate，命令与上文一致，只替换 recipe 路径。新增入口保留同一 LoCoMo Loader、Reader/Judge 提示与评分；改变的是召回后交给 Reader 的证据材料。测分须报告实际版本和预算，不能将 V2 的历史试验分数归属给 V3。

@@ -63,7 +63,7 @@ class ModelSettings(BaseModel):
 class Recipe(BaseModel):
     model_config = ConfigDict(extra="forbid")
     dataset: Literal["longmemeval-s", "beam10m"]
-    method: Literal["baseline", "lme-v7", "beam-multiquery", "source-evidence-v2"]
+    method: Literal["baseline", "lme-v7", "beam-multiquery", "source-evidence-v3", "native-sdk-json"]
     questions: Path
     evaluation: Path
     audit_report: Path
@@ -95,22 +95,24 @@ class Recipe(BaseModel):
 
     @model_validator(mode="after")
     def compatible_method(self):
+        if self.method == "native-sdk-json" and self.dataset != "longmemeval-s":
+            raise ValueError("native-sdk-json requires longmemeval-s")
         if self.method == "lme-v7" and self.dataset != "longmemeval-s":
             raise ValueError("lme-v7 requires longmemeval-s")
         if self.method == "beam-multiquery" and (
             self.dataset != "beam10m" or self.rewriter is None
         ):
             raise ValueError("beam-multiquery requires BEAM and rewriter settings")
-        if self.method == "source-evidence-v2":
+        if self.method == "source-evidence-v3":
             if (
                 self.evidence_options is None
                 or self.evidence_options.max_tokens != self.context_budget
             ):
                 raise ValueError(
-                    "source-evidence-v2 requires explicit evidence_options matching context_budget"
+                    "source-evidence-v3 requires explicit evidence_options matching context_budget"
                 )
         elif self.evidence_options is not None:
-            raise ValueError("evidence_options requires source-evidence-v2")
+            raise ValueError("evidence_options requires source-evidence-v3")
         if self.source == "json" and self.source_directory is None:
             raise ValueError("JSON sources require source_directory")
         return self

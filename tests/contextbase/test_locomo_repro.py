@@ -129,3 +129,82 @@ def test_ingestion_needs_explicit_opt_in_and_namespaces_cannot_escape(tmp_path):
         campaign.recipe.bank("../../existing-bank")
     with pytest.raises(ValidationError):
         LoCoMoRecipe(output=tmp_path, api_url="http://localhost", bank_prefix="x" * 70)
+
+
+def test_enhanced_recipe_is_explicit_and_native_recipe_serialization_stays_compatible(
+    tmp_path,
+):
+    native = recipe(tmp_path)
+    assert "enhanced_memory" not in native.model_dump(mode="json")
+    assert "evidence_options" not in native.model_dump(mode="json")
+    enhanced = LoCoMoRecipe(**{**native.model_dump(), "enhanced_memory": True})
+    assert enhanced.evidence_options.assembly == "native_first"
+    assert enhanced.evidence_options.max_tokens == 64000
+    with pytest.raises(ValidationError):
+        LoCoMoRecipe(
+            **{**native.model_dump(), "evidence_options": {"max_tokens": 64000}}
+        )
+
+
+def test_enhanced_evaluation_uses_packed_context_without_raw_recall_override(
+    tmp_path, monkeypatch
+):
+    from memory_bench.contextbase.evidence_client import EvidenceClient
+    from memory_bench.contextbase.locomo_repro import digest
+
+    monkeypatch.setenv("CONTEXTBASE_MODEL_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("CONTEXTBASE_READ_KEY", "synthetic-test-only")
+    campaign = Campaign(
+        LoCoMoRecipe(**{**recipe(tmp_path).model_dump(), "enhanced_memory": True})
+    )
+    signature = {"synthetic": "dispatch-test"}
+    write_json(campaign.root / "signature.private.json", signature)
+    write_json(
+        campaign.root / "source-audit.private.json",
+        {"success": True, "signature_sha256": digest(signature)},
+    )
+    write_json(
+        campaign.root / "questions.private.json",
+        [{"id": "q", "query": "question", "bank_id": "b", "meta": {}}],
+    )
+    write_json(
+        campaign.root / "evaluation.private.json",
+        {"q": {"gold_answers": ["reference"], "category": 1}},
+    )
+    captured = {}
+
+    class Dataset:
+        def build_rag_prompt(self, query, context, *args, meta):
+            captured.update(context=context, meta=meta)
+            return "reader prompt"
+
+        def build_judge_prompt(self, *args):
+            return "judge prompt"
+
+    async def recall(self, bank, query, **kwargs):
+        return {"evidence": {"context": "SOURCE MATERIAL"}}
+
+    async def generate(*args):
+        return (
+            {"answer": "first"}
+            if args[2] == "reader"
+            else {"correct": False, "reason": "first valid negative"}
+        )
+
+    monkeypatch.setattr(EvidenceClient, "recall", recall)
+    monkeypatch.setattr(
+        "memory_bench.contextbase.locomo_repro.upstream_dataset", lambda: Dataset()
+    )
+    monkeypatch.setattr(campaign, "generate", generate)
+    with pytest.raises(RuntimeError, match="Incomplete run"):
+        asyncio.run(campaign.evaluate(0))
+    assert (
+        captured["context"] == "SOURCE MATERIAL"
+        and "_raw_response" not in captured["meta"]
+    )
+    assert (
+        json.loads((campaign.root / "questions/q/result.private.json").read_text())[
+            "correct"
+        ]
+        is False
+    )

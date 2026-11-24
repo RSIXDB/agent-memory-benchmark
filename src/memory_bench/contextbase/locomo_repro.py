@@ -26,8 +26,16 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import aiohttp
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    model_serializer,
+    model_validator,
+)
 
+from .evidence_client import EnhancedMemoryOptions, EvidenceClient
 from .guards import exclusive_run
 from .storage import read_json, write_json
 
@@ -78,6 +86,24 @@ class LoCoMoRecipe(BaseModel):
     concurrency: int = Field(default=4, ge=1, le=12)
     format_retries: int = Field(default=1, ge=0, le=2)
     ingest_doc_id_metadata: bool = False
+    enhanced_memory: bool = False
+    evidence_options: EnhancedMemoryOptions | None = None
+
+    @model_validator(mode="after")
+    def enhancement_configuration(self):
+        if self.enhanced_memory and self.evidence_options is None:
+            self.evidence_options = EnhancedMemoryOptions()
+        if not self.enhanced_memory and self.evidence_options is not None:
+            raise ValueError("evidence_options requires enhanced_memory=true")
+        return self
+
+    @model_serializer(mode="wrap")
+    def serialize_recipe(self, handler):
+        data = handler(self)
+        if not self.enhanced_memory:
+            data.pop("enhanced_memory", None)
+            data.pop("evidence_options", None)
+        return data
 
     def bank(self, user_id: str) -> str:
         if not re.fullmatch(r"conv-\d+", user_id):
@@ -592,39 +618,67 @@ class Campaign:
                     final = self.root / "questions" / qid / "result.private.json"
                     if final.exists():
                         return
-                    recallpath = final.parent / "recall.private.json.gz"
-                    if recallpath.exists():
-                        raw = read_json(recallpath)
+                    context = ""
+                    meta = dict(question["meta"])
+                    if self.recipe.enhanced_memory:
+                        evidencepath = final.parent / "evidence.private.json.gz"
+                        if evidencepath.exists():
+                            evidence = read_json(evidencepath)
+                        else:
+                            client = EvidenceClient(
+                                self.recipe.api_url,
+                                {
+                                    "Authorization": "Bearer "
+                                    + os.environ[self.recipe.api_key_env]
+                                },
+                                self.recipe.evidence_options,
+                            )
+                            evidence = await client.recall(
+                                question["bank_id"],
+                                question["query"][:1900],
+                                max_tokens=32768,
+                                query_timestamp=meta.get("query_timestamp"),
+                            )
+                            evidencepath.parent.mkdir(
+                                parents=True, exist_ok=True, mode=0o700
+                            )
+                            with gzip.open(evidencepath, "wt") as output:
+                                json.dump(evidence, output, ensure_ascii=False)
+                            evidencepath.chmod(0o600)
+                        context = evidence["evidence"]["context"]
                     else:
-                        body = {
-                            "query": question["query"][:1900],
-                            "budget": "high",
-                            "max_tokens": 32768,
-                            "include": {
-                                "entities": None,
-                                "chunks": {"max_tokens": 16384},
-                            },
-                        }
-                        if question["meta"].get("query_timestamp"):
-                            body["query_timestamp"] = question["meta"][
-                                "query_timestamp"
-                            ]
-                        raw = await self.api(
-                            session,
-                            "POST",
-                            f"/v1/default/banks/{question['bank_id']}/memories/recall",
-                            body,
-                        )
-                        recallpath.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-                        with gzip.open(recallpath, "wt") as output:
-                            json.dump(raw, output, ensure_ascii=False)
-                        recallpath.chmod(0o600)
+                        recallpath = final.parent / "recall.private.json.gz"
+                        if recallpath.exists():
+                            raw = read_json(recallpath)
+                        else:
+                            body = {
+                                "query": question["query"][:1900],
+                                "budget": "high",
+                                "max_tokens": 32768,
+                                "include": {
+                                    "entities": None,
+                                    "chunks": {"max_tokens": 16384},
+                                },
+                            }
+                            if question["meta"].get("query_timestamp"):
+                                body["query_timestamp"] = question["meta"][
+                                    "query_timestamp"
+                                ]
+                            raw = await self.api(
+                                session,
+                                "POST",
+                                f"/v1/default/banks/{question['bank_id']}/memories/recall",
+                                body,
+                            )
+                            recallpath.parent.mkdir(
+                                parents=True, exist_ok=True, mode=0o700
+                            )
+                            with gzip.open(recallpath, "wt") as output:
+                                json.dump(raw, output, ensure_ascii=False)
+                            recallpath.chmod(0o600)
+                        meta["_raw_response"] = raw
                     prompt = dataset.build_rag_prompt(
-                        question["query"],
-                        "",
-                        "open",
-                        "locomo10",
-                        meta={**question["meta"], "_raw_response": raw},
+                        question["query"], context, "open", "locomo10", meta=meta
                     )
                     answer = await self.generate(
                         session, qid, "reader", prompt, READER_PROPERTIES
