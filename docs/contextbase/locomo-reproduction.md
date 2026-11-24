@@ -27,7 +27,7 @@ PYTHONPATH=src uv run python -m memory_bench.contextbase.locomo_repro evaluate \
 
 `ingest` 使用稳定 operation ID 并保存接收回执。操作状态不明时停止；只有审计后才能通过服务端既有 operation retry 恢复，不能直接重发 retain。`audit` 检查 bank 配置、完整文档集合、原文、日期、会话说明、metadata 和 tags；事实、向量及原有大库是否被修改，仍需 PostgreSQL 只读审计。
 
-`evaluate` 默认允许的新模型调用数为 0；上述 3200 是一次运行最多新增的物理请求数，不是 token 预算。应另在网关设置 token/费用上限。已有首次有效答案和判分会直接复用；尚未确定结果的请求不能自动重试。格式错误最多重试一次，完整答案（包括错误答案）不会重抽。只在 1540 题均完成后发布完整 accuracy，技术失败保留在单独清单中。
+`evaluate` 默认允许的新模型调用数为 0；上述 3200 限制本工具向配置模型端点新增的 HTTP 请求数，不是 token 预算。网关若轮换 key 或重试，上游实际尝试数可能更多，须另设上游请求及 token/费用上限。已有首次有效答案和判分会直接复用；尚未确定结果的请求不能自动重试。格式错误最多重试一次，完整答案（包括错误答案）不会重抽。只在 1540 题均完成后发布完整 accuracy，技术失败保留在单独清单中。
 
 ## 与 issue 112 历史运行的关系
 

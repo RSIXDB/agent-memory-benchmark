@@ -143,6 +143,7 @@ def test_explicit_sdk_comparator_preserves_the_full_response_and_first_cache(tmp
     from memory_bench.contextbase.transport import ReadOnlyAPI
 
     requests = []
+    closed = []
     raw = {"results": [{"id": "m", "text": "fact", "entities": None}], "trace": None, "chunks": {"c": {"text": "source"}}}
 
     class SDK:
@@ -153,12 +154,15 @@ def test_explicit_sdk_comparator_preserves_the_full_response_and_first_cache(tmp
             requests.append(request)
             return SimpleNamespace(model_dump=lambda **_: raw)
 
+        async def aclose(self):
+            closed.append(True)
+
     monkeypatch.setitem(sys.modules, "contextbase_client", SimpleNamespace(ContextBase=SDK))
     monkeypatch.setenv("CONTEXTBASE_READ_KEY", "synthetic")
     recipe = Recipe(dataset="longmemeval-s", method="native-sdk-json", questions=tmp_path / "q", evaluation=tmp_path / "e", audit_report=tmp_path / "a", output=tmp_path, api_url="http://127.0.0.1:1", reader={"model": "test"}, judge={"model": "test"})
     q = Question(id="q", query="question", bank_id="b", query_timestamp="2020-01-01T00:00:00Z")
     api = ReadOnlyAPI(recipe)
     first = asyncio.run(api.native_sdk_context(q))
-    assert first == json.dumps(raw)
+    assert first == json.dumps(raw) and closed == [True]
     assert asyncio.run(api.native_sdk_context(q)) == first and len(requests) == 1
     assert requests[0] == {"bank_id": "b", "query": "question", "budget": "high", "max_tokens": 32768, "include_entities": False, "include_chunks": True, "max_chunk_tokens": 16384, "trace": False, "query_timestamp": q.query_timestamp}

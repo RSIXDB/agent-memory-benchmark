@@ -47,7 +47,7 @@ PYTHONPATH=src uv run python -m memory_bench.contextbase run \
 该路径只请求一次 recall-evidence，缓存完整证据及参数摘要，不先重复请求普通 recall，不使用 rewriter。Reader、judge 和评分沿用对应数据集的既有实现。固定抽样应先写入独立 questions.jsonl，记录种子和问题集合摘要；不要按旧判分挑选测试题。普通 AMB HTTP provider 则仍使用前述环境变量开关。
 
 
-本次已有质量统计对应修正前的 V2 父提交。V3 修正“原文日期缺失被替换为导入日期”的问题，保留未知日期，store 层在日期过滤时排除未知日期；REST 当前拒绝 before，避免只限制原文而未同步限制原生事实。V2 的分数不能直接视为 V3 已验证的准确率；当前仍为实验配置。
+BEAM已有质量统计对应修正前的 V2 父提交；V3已完成LoCoMo1540题和LME500题扩展，详见[完整结果](night-results-20261125.md)。该轮LoCoMo小幅上升、LME回退，尚未证实跨集稳定准确率收益。V3 修正“原文日期缺失被替换为导入日期”的问题，保留未知日期，store 层在日期过滤时排除未知日期；REST 当前拒绝 before，避免只限制原文而未同步限制原生事实。V2 的分数不能直接视为 V3 已验证的准确率；当前仍为实验配置。
 
 
 增强路径不读取普通 recall 的关联 chunk 回包，原文候选和最终材料分别受 max_documents/max_source_characters/max_tokens 控制。AMB_RECALL_MAX_CHUNK_TOKENS 不是这一路径的原文预算；显式关闭 chunk 原文或请求额外 entities 时，适配器拒绝冲突配置，不覆盖调用方的约束。

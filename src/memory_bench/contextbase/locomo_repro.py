@@ -532,7 +532,14 @@ class Campaign:
                         endpoint, json=body, headers={"Authorization": "Bearer " + key}
                     ) as result:
                         content = (await result.text()).replace(key, "<redacted>")
-                        raw = json.loads(content)
+                        try:
+                            raw = json.loads(content)
+                        except json.JSONDecodeError:
+                            write_json(
+                                folder / "unparseable-response.private.json",
+                                {"status": result.status, "body_text": content},
+                            )
+                            raise
                         saved = {"status": result.status, "body": raw}
                         rawpath.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
                         with gzip.open(rawpath, "wt") as output:

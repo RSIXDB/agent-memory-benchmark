@@ -112,8 +112,11 @@ class ReadOnlyAPI:
         client = ContextBase(
             base_url=self.recipe.api_url, api_key=key, max_attempts=1, timeout=240
         )
-        result = await client.arecall(**request)
-        raw = result.model_dump(mode="json")
+        try:
+            result = await client.arecall(**request)
+            raw = result.model_dump(mode="json")
+        finally:
+            await client.aclose()
         write_json(cache, {"identity": identity, "raw": raw, "raw_sha256": digest(raw)})
         return json.dumps(raw)
 

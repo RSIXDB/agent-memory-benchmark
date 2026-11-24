@@ -208,3 +208,32 @@ def test_enhanced_evaluation_uses_packed_context_without_raw_recall_override(
         ]
         is False
     )
+
+
+def test_non_json_provider_error_is_preserved_without_resampling(tmp_path, monkeypatch):
+    from memory_bench.contextbase.storage import read_json
+
+    monkeypatch.setenv("CONTEXTBASE_MODEL_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("CONTEXTBASE_MODEL_KEY", "synthetic-private-key")
+    campaign = Campaign(recipe(tmp_path))
+    campaign.max_calls = 3
+
+    class Response(FakeResponse):
+        status = 503
+
+        async def text(self):
+            return "upstream unavailable; synthetic-private-key"
+
+    class Session(FakeSession):
+        def post(self, *args, **kwargs):
+            self.calls += 1
+            return Response()
+
+    session = Session()
+    with pytest.raises(json.JSONDecodeError):
+        asyncio.run(campaign.generate(session, "q", "judge", "p", JUDGE_PROPERTIES))
+    saved = read_json(campaign.root / "questions/q/judge/0/unparseable-response.private.json")
+    assert saved == {"status": 503, "body_text": "upstream unavailable; <redacted>"}
+    with pytest.raises(RuntimeError, match="Unresolved"):
+        asyncio.run(campaign.generate(session, "q", "judge", "p", JUDGE_PROPERTIES))
+    assert session.calls == 1
