@@ -13,3 +13,7 @@ data/tempo/
 .env*.local
 .env
 outputs-archive/
+
+# Private ContextBase run inputs, credentials and artifacts
+.contextbase/
+**/*.private.json

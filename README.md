@@ -80,3 +80,7 @@ Results are saved to `outputs/{dataset}/{memory}/{mode}/{domain}.json` and can b
 - Python ≥ 3.11
 - `GEMINI_API_KEY` in `.env` or environment
 - For MemBench: set `MEMBENCH_DATA_PATH` to your local data directory
+
+## ContextBase reproduction recipes
+
+Reuse-only LongMemEval-S v7 and BEAM 10M multi-query recipes, read-only bank audits, historical material replay and bounded live evaluation: [ContextBase guide](docs/contextbase/README.md). Upstream AMB defaults are unchanged.
