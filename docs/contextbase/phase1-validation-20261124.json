@@ -1,0 +1,64 @@
+{
+  "date": "2026-11-24",
+  "comparison_base": "cd3bff5",
+  "scope": "Run-integrity guards only; no fresh model scoring",
+  "physical_model_calls": 0,
+  "behavioral_tests_passed": 21,
+  "unchanged_recipe_files": {
+    "beam.py": "4da287934b2425c754a9893fdd3d93a407bcfe4758aca9374436a717a6b8c8e5",
+    "lme_v7.py": "6fac2b481bc4d100b1527503f8b1cf6103ae33116797fdb9076ee9e1cbd4df59",
+    "prompts.py": "aa41e8868ad5c56d7d3612d541d290beae89423cfe5322f577d9b51829de0f9a",
+    "transport.py": "8d369bcac27f12de8de856241339ab7739f7bdce57ea27db8379fe66be4c7e3d"
+  },
+  "context_ast_equal": true,
+  "reader_and_grading_try_body_ast_equal": true,
+  "replay": {
+    "lme": {
+      "dataset": "longmemeval-s",
+      "questions": 500,
+      "model_calls": 0,
+      "all_contexts_equal": true,
+      "all_prompts_or_ids_equal": true,
+      "historical_score_recount": 0.952,
+      "scope": "Material reconstruction and historical score recount; not fresh model scoring"
+    },
+    "beam": {
+      "dataset": "beam10m",
+      "questions": 200,
+      "model_calls": 0,
+      "all_contexts_equal": true,
+      "all_prompts_or_ids_equal": true,
+      "historical_score_recount": 0.6604620310245312,
+      "scope": "Material reconstruction and historical score recount; not fresh model scoring"
+    }
+  },
+  "audit_run": {
+    "id": "d1735e63585d45acb5868891bba5ffec",
+    "state": "complete",
+    "reports": {
+      "longmemeval-reuse-audit.json": "3eeb9d1c973d30e7124ed78d7b619cbc94eaef6f04fe8e558a3714e1bdc683b0",
+      "beam10m-reuse-audit.json": "8477b923f3701b96a8889de4d38ead8129e1422a3ea244acb749a413266fdf6b"
+    },
+    "started": 1795529310.1929052,
+    "finished": 1795529550.2887447,
+    "readonly": true,
+    "model_calls": 0,
+    "failed_sections": []
+  },
+  "guard_integration": {
+    "lme": {
+      "questions": 500,
+      "sealed_audit": true,
+      "database_and_bank_config_match": true,
+      "source_fingerprints_checked": 500,
+      "model_calls": 0
+    },
+    "beam": {
+      "questions": 200,
+      "sealed_audit": true,
+      "database_and_bank_config_match": true,
+      "source_fingerprints_checked": 0,
+      "model_calls": 0
+    }
+  }
+}

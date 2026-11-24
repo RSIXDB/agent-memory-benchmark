@@ -1,0 +1,25 @@
+{
+  "dataset": "beam10m",
+  "method": "beam-multiquery",
+  "questions": ".contextbase/beam10m/questions.jsonl",
+  "evaluation": ".contextbase/beam10m/evaluation.json",
+  "audit_report": ".contextbase/audit/beam10m-reuse-audit.json",
+  "output": ".contextbase/runs/beam10m-enhanced",
+  "api_url": "http://127.0.0.1:8888",
+  "facts_budget": 12288,
+  "chunks_budget": 8192,
+  "context_budget": 60000,
+  "reader": {
+    "model": "volcengine/deepseek-v4.1-flash",
+    "max_tokens": 16384
+  },
+  "judge": {
+    "model": "volcengine/deepseek-v4.1-flash",
+    "max_tokens": 8192
+  },
+  "rewriter": {
+    "model": "volcengine/deepseek-v4.1-flash",
+    "max_tokens": 8192
+  },
+  "api_keys_file_env": "CONTEXTBASE_BANK_KEYS_FILE"
+}

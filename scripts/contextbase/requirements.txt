@@ -1,0 +1,4 @@
+aiohttp==3.14.3
+asyncpg==0.30.0
+pydantic==2.12.5
+tiktoken==0.12.0

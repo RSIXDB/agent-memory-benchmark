@@ -1,0 +1,99 @@
+{
+  "date": "2026-11-24",
+  "upstream_commit": "01bd83f3fa5245d6be3986cfab81fdd828f26acd",
+  "source_commit": "0951c3664b3083a99268040c8c84113073a057b3",
+  "prepared_source_checks": {
+    "questions": 500,
+    "mismatches": 0
+  },
+  "datasets": {
+    "longmemeval-s": {
+      "banks_verified": 500,
+      "counts": {
+        "documents": 23867,
+        "chunks": 127245,
+        "memory_units": 230126,
+        "entities": 319426,
+        "memory_links": 4491234
+      },
+      "reusable": true,
+      "bank_config_variants": 1,
+      "replay": {
+        "dataset": "longmemeval-s",
+        "questions": 500,
+        "model_calls": 0,
+        "all_contexts_equal": true,
+        "all_prompts_or_ids_equal": true,
+        "historical_score_recount": 0.952,
+        "scope": "Material reconstruction and historical score recount; not fresh model scoring"
+      },
+      "live_smoke": {
+        "questions": 1,
+        "complete": 1,
+        "technical_failures": 0,
+        "physical_calls": 2,
+        "scope": "Operational smoke only, no accuracy claim"
+      },
+      "audit_sha256": "4295f0f49cbf34714650041cbdc0f77548c9cdda9e75a20cea8b3dceaf05ec26",
+      "replay_sha256": "9dbed796451925aad02d16efdae57619db4ece81b15c5433417fe957853042d2"
+    },
+    "beam10m": {
+      "banks_verified": 10,
+      "counts": {
+        "documents": 5265,
+        "chunks": 166167,
+        "memory_units": 392292,
+        "entities": 112261,
+        "unit_entities": 1357119,
+        "memory_links": 14777590,
+        "entity_cooccurrences": 717074
+      },
+      "reusable": true,
+      "bank_config_variants": 1,
+      "replay": {
+        "dataset": "beam10m",
+        "questions": 200,
+        "model_calls": 0,
+        "all_contexts_equal": true,
+        "all_prompts_or_ids_equal": true,
+        "historical_score_recount": 0.6604620310245312,
+        "scope": "Material reconstruction and historical score recount; not fresh model scoring"
+      },
+      "live_smoke": {
+        "questions": 1,
+        "complete": 1,
+        "technical_failures": 0,
+        "physical_calls": 3,
+        "scope": "Operational smoke only, no accuracy claim"
+      },
+      "audit_sha256": "f1a56080f0f88555ca806c0987aa2fe0ec2425296ba0e50743f5dcf6f61e1c2c",
+      "replay_sha256": "45ca7b9d5c1775935cca6f53240ffa74f9882d5d5c62f6c4c7e6385d9be37645"
+    }
+  },
+  "core_source": {
+    "files": 390,
+    "changed": []
+  },
+  "model_services": {
+    "embedding": {
+      "metadata_sha256": "fac04a000a16f01fad34b46eff2eb7b7f405c718bda62c8714068d337b295968",
+      "identity": {
+        "model_id": "BAAI/bge-m3",
+        "max_input_length": 8192,
+        "auto_truncate": true
+      }
+    },
+    "reranker": {
+      "metadata_sha256": "5521f78693f868f3d008ff496c0361b55877c56eecc9de99f116209f9dd4328a",
+      "identity": {
+        "model_id": "BAAI/bge-reranker-v2-m3@953dc6f",
+        "max_input_length": 8192,
+        "auto_truncate": true
+      }
+    }
+  },
+  "service_restored": {
+    "contextbase-beam10m-night-api.service": "inactive",
+    "contextbase-longmemeval-low-api.service": "active"
+  }
+}
