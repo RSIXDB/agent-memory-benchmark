@@ -1,0 +1,37 @@
+{
+  "dataset": "longmemeval-s",
+  "method": "source-evidence-v2",
+  "questions": ".contextbase/longmemeval-s/questions.jsonl",
+  "evaluation": ".contextbase/longmemeval-s/evaluation.json",
+  "audit_report": ".contextbase/audit/longmemeval-reuse-audit.json",
+  "output": ".contextbase/runs/longmemeval-s-source-evidence-v2",
+  "api_url": "http://127.0.0.1:8888",
+  "facts_budget": 32768,
+  "chunks_budget": 16384,
+  "context_budget": 48000,
+  "reader": {
+    "model": "glm-5.3",
+    "max_tokens": 16384,
+    "extra_body": {
+      "thinking": {
+        "type": "adaptive"
+      },
+      "output_config": {
+        "effort": "high"
+      }
+    }
+  },
+  "judge": {
+    "model": "volcengine/deepseek-v4.1-flash",
+    "max_tokens": 8192
+  },
+  "evidence_options": {
+    "version": "source-evidence-v2",
+    "max_tokens": 48000,
+    "independent_search": true,
+    "fact_fraction": 0.15,
+    "user_fraction": 0.6,
+    "neighbor_messages": 1
+  },
+  "environment_report": ".contextbase/current-environment.json"
+}

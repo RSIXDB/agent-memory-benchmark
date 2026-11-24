@@ -47,17 +47,17 @@ class ReadOnlyAPI:
             "/v1/default/banks/" + quote(question.bank_id, safe="") + "/memories/recall"
         )
         start = time.monotonic()
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=300)
-        ) as session:
-            async with session.post(
+        async with (
+            aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=300)) as session,
+            session.post(
                 self.recipe.api_url.rstrip("/") + path,
                 json=body,
                 headers={"Authorization": "Bearer " + key},
-            ) as response:
-                if response.status != 200:
-                    raise RuntimeError(f"Recall HTTP {response.status}")
-                raw = await response.json()
+            ) as response,
+        ):
+            if response.status != 200:
+                raise RuntimeError(f"Recall HTTP {response.status}")
+            raw = await response.json()
         result = Recall.model_validate(raw)
         write_json(
             cache,
@@ -69,6 +69,49 @@ class ReadOnlyAPI:
             },
         )
         return result
+
+    async def source_evidence(self, question: Question) -> str:
+        """Opt-in route owns native recall; do not issue a duplicate recall here."""
+        from .evidence_client import EvidenceClient
+
+        options = self.recipe.evidence_options
+        if options is None:
+            raise ValueError("An explicit evidence configuration is required")
+        request = {
+            "bank_id": question.bank_id,
+            "query": question.query,
+            "max_tokens": self.recipe.facts_budget,
+            "query_timestamp": question.query_timestamp,
+            "options": options.model_dump(mode="json"),
+        }
+        cache = self.recipe.output / "evidence" / (digest(request) + ".json")
+        if cache.exists():
+            saved = read_json(cache)
+            if (
+                saved["request"] != request
+                or digest(saved["response"]) != saved["response_sha256"]
+            ):
+                raise ValueError("Evidence cache identity/integrity mismatch")
+            return saved["response"]["evidence"]["context"]
+        if self.recipe.api_keys_file_env:
+            key = read_json(Path(os.environ[self.recipe.api_keys_file_env]))[
+                question.bank_id
+            ]
+        else:
+            key = os.environ[self.recipe.api_key_env]
+        client = EvidenceClient(
+            self.recipe.api_url, {"Authorization": "Bearer " + key}, options
+        )
+        raw = await client.recall(
+            question.bank_id,
+            question.query,
+            max_tokens=self.recipe.facts_budget,
+            query_timestamp=question.query_timestamp,
+        )
+        write_json(
+            cache, {"request": request, "response": raw, "response_sha256": digest(raw)}
+        )
+        return raw["evidence"]["context"]
 
 
 class Models:
@@ -132,10 +175,11 @@ class Models:
         url = os.environ[settings.base_url_env].rstrip("/") + "/v1/messages"
         start = time.monotonic()
         try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=240)
-            ) as session:
-                async with session.post(
+            async with (
+                aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=240)
+                ) as session,
+                session.post(
                     url,
                     json=body,
                     headers={
@@ -143,14 +187,15 @@ class Models:
                         "Authorization": "Bearer " + key,
                         "anthropic-version": "2023-06-01",
                     },
-                ) as response:
-                    raw = await response.json()
-                    write_json(
-                        folder / "raw.json",
-                        {"status": response.status, "response": raw},
-                    )
-                    if response.status != 200:
-                        raise RuntimeError(f"Model HTTP {response.status}")
+                ) as response,
+            ):
+                raw = await response.json()
+                write_json(
+                    folder / "raw.json",
+                    {"status": response.status, "response": raw},
+                )
+                if response.status != 200:
+                    raise RuntimeError(f"Model HTTP {response.status}")
             if raw.get("stop_reason") == "max_tokens":
                 raise ValueError("Model output truncated")
             if schema:

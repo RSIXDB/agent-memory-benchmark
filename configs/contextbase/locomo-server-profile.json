@@ -1,0 +1,28 @@
+{
+  "purpose": "Recorded ECS LoCoMo reproduction settings; deployment input, not an AMB runner recipe",
+  "service_source_commit": "0951c3664b3083a99268040c8c84113073a057b3",
+  "process_environment": {
+    "CONTEXTBASE_API_LLM_PROVIDER": "anthropic",
+    "CONTEXTBASE_API_LLM_MODEL": "volcengine/deepseek-v4.1-flash",
+    "CONTEXTBASE_API_RETAIN_LLM_REASONING_EFFORT": "high",
+    "CONTEXTBASE_API_RETAIN_MAX_COMPLETION_TOKENS": "64000",
+    "CONTEXTBASE_API_EMBEDDINGS_PROVIDER": "tei",
+    "CONTEXTBASE_API_RERANKER_PROVIDER": "tei",
+    "CONTEXTBASE_API_TEXT_SEARCH_EXTENSION": "pg_search",
+    "CONTEXTBASE_API_TOKENIZER_ENCODING": "o200k_base"
+  },
+  "bank_overrides": {
+    "retain_extraction_mode": "verbose",
+    "retain_chunk_size": 3000,
+    "enable_observations": false,
+    "enable_auto_consolidation": false,
+    "store_document_text": true,
+    "retain_mission": "Preserve the concrete details of the conversation, including explicit future plans, intentions, preferences, motivations, quantities, named items, places, and exceptions. When a short reply answers the preceding speaker's question, include that question's topic and time frame in the fact so the reply remains understandable on its own. Resolve pronouns to the correct speaker. Preserve the original relative date expression and any explicit weekday alongside a normalized date; if a date is ambiguous, retain that ambiguity rather than inventing precision. Keep different dated events separate. Preserve supplied image captions and descriptions when they carry factual details. Do not add facts or conclusions not supported by the conversation."
+  },
+  "deployment_specific_inputs": [
+    "LLM_BASE_URL and LLM_API_KEY in private environment/secret files",
+    "EMBEDDINGS_TEI_URL and RERANKER_TEI_URL for the selected self-hosted model snapshots",
+    "PostgreSQL DSN, auth realm and persistent data paths using the standard service startup guide"
+  ],
+  "note": "Use the deployment startup/render workflow. Bank GET config does not replace process/LLM configuration capture. Keep all effective settings and hashes with the run. No GPT model is used by this profile."
+}

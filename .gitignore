@@ -17,3 +17,6 @@ outputs-archive/
 # Private ContextBase run inputs, credentials and artifacts
 .contextbase/
 **/*.private.json
+
+# Persistent LoCoMo reproduction artifacts
+.local/

@@ -899,6 +899,9 @@ class _HindsightBase(MemoryProvider):
     # ── Sync retrieve ─────────────────────────────────────────────────────────
 
     def retrieve(self, query: str, k: int = 10, user_id: str | None = None, query_timestamp: str | None = None, filters: dict | None = None) -> tuple[list[Document], dict | None]:
+        from ..contextbase.evidence_client import enhanced_memory_enabled
+        if enhanced_memory_enabled():
+            return asyncio.run(self.async_retrieve(query, k, user_id, query_timestamp, filters))
         import logging
         _log = logging.getLogger(__name__)
         for attempt in range(3):
@@ -1028,6 +1031,9 @@ class HindsightMemoryProvider(_HindsightBase):
             pass
 
     async def async_retrieve(self, query: str, k: int = 10, user_id: str | None = None, query_timestamp: str | None = None, filters: dict | None = None):
+        from ..contextbase.evidence_client import enhanced_memory_enabled
+        if enhanced_memory_enabled():
+            raise ValueError("Enhanced memory requires the ContextBase HTTP provider")
         import logging
         _log = logging.getLogger(__name__)
         kwargs = self._recall_kwargs(query, user_id, query_timestamp, filters=filters)
@@ -1182,6 +1188,9 @@ class HindsightCloudMemoryProvider(_HindsightBase):
             await self._await_bank_ingest(client, bank_id)
 
     async def async_retrieve(self, query: str, k: int = 10, user_id: str | None = None, query_timestamp: str | None = None, filters: dict | None = None) -> tuple[list[Document], dict | None]:
+        from ..contextbase.evidence_client import enhanced_memory_enabled, retrieve_enhanced
+        if enhanced_memory_enabled():
+            return await retrieve_enhanced(self, query, user_id, query_timestamp, filters)
         import logging
         _log = logging.getLogger(__name__)
         client = self._get_async_client()

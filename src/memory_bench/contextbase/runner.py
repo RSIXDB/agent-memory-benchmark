@@ -58,6 +58,8 @@ async def context(
     models: Models,
 ) -> str:
     source.require_bank(question)
+    if recipe.method == "source-evidence-v2":
+        return await api.source_evidence(question)
     baseline = await api.recall(question, recipe.facts_budget, recipe.chunks_budget)
     if recipe.method == "lme-v7":
         rows = await source.read(question)
